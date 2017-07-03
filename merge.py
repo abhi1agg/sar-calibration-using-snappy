@@ -1,4 +1,5 @@
 from tkinter import *
+import datetime
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 import math
@@ -7,8 +8,21 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import random
 import os
+import snappy
+from snappy import jpy
+from snappy import GPF
+from snappy import ProductIO
+
+
 desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-savefile=open('%s/snap.txt'%desktop,'w')
+curr_time = str(datetime.datetime.now())
+curr_time = curr_time.replace(':','_')
+new_time=curr_time.split()
+newtime = new_time[0]+new_time[1]
+savefile=open('%s\log_%s.txt'%(desktop,str(newtime)),'w')
+selectedBand=" "
+#savefile=open("%s\log_"+str(newtime)+'.txt','w')
+
 intensityArray = []
 a = [0 for x in range(14)] #Stores textbox variables
 coordinateArray=[]
@@ -24,12 +38,13 @@ filename="0"
 def display():   #
     t = int(num.get())
     for i in range(0,2*t,2):
-        tk.Label(mainframe, text="X"+str((i+2)//2)+" Y"+str((i+2)//2)).grid(column=1,row=i+8,sticky=W)
+        tk.Label(mainframe, text="X"+str((i+2)//2)+" Y"+str((i+2)//2)).grid(column=1,row=i+9,sticky=W)
         a[i] = tk.Entry(mainframe, width=15)
-        a[i].grid(column=2, row=(8+i), sticky=(W,E))
+        a[i].grid(column=2, row=(9+i), sticky=(W,E))
         a[i+1] = tk.Entry(mainframe, width=15)
-        a[i+1].grid(column=3, row=(8+i), sticky=(W,E))
+        a[i+1].grid(column=3, row=(9+i), sticky=(W,E))
     tk.Button(mainframe, text="Process Data", command=processData).grid(column=2, row=3+len(a), sticky=W)
+    for child in mainframe.winfo_children(): child.grid_configure(padx=10, pady=10)
 
 
 
@@ -40,7 +55,6 @@ def display():   #
 def processData():
     global a
     global filename
-    print("Hello!")
     newframe=tk.Toplevel(root)
     calculateSigma()   #Calculate Radar Cross Section
     createCoordinateArray() #Creates array for X and Y coordinates of reflectors.
@@ -63,22 +77,18 @@ def createCoordinateArray():
 #================================================= Function to do all calculations of K=========================================
 
 def findK(newframe):
-    import snappy
-    from snappy import jpy
-    from snappy import GPF
-    from snappy import ProductIO
     global intensityArray
     n=int(num.get())
     global coordinateArray
     global k_VH
     global filename
-    
+    global OpMenu
     for i in range(n):
         #importing product
         if(i==0):
             k_VH=[]
         p=ProductIO.readProduct(filename)
-        
+        selectedBand= str(OpMenu.get())
         BandNames=list(p.getBandNames())#function to create array of BandNames
         
         HashMap = jpy.get_type('java.util.HashMap')
@@ -95,15 +105,17 @@ def findK(newframe):
         parameters.put('region', "%s,%s,128,128"%(a,b) )
         subset = GPF.createProduct('Subset', parameters, p)
         
-        Inty_VH = subset.getBand('Intensity_VH')
+        Inty_VH = subset.getBand(selectedBand)
+        print(OpMenu.get())
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
+        
 
         #creating subset 20 x 20 to calculate Ip
         parameters.put('region', "53,53,20,20")
         subset20 = GPF.createProduct('Subset', parameters, subset)
-        Inty_VH = subset20.getBand('Intensity_VH')
+        Inty_VH = subset20.getBand(selectedBand)
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
@@ -118,7 +130,7 @@ def findK(newframe):
         #creating more subset 10 x 10 for background correction
         parameters.put('region', "10,10,10,10")
         subset1 = GPF.createProduct('Subset', parameters, subset)
-        Inty_VH = subset1.getBand('Intensity_VH')
+        Inty_VH = subset1.getBand(selectedBand)
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
@@ -131,7 +143,7 @@ def findK(newframe):
         
         parameters.put('region', "10,100,10,10")
         subset2 = GPF.createProduct('Subset', parameters, subset)
-        Inty_VH = subset2.getBand('Intensity_VH')
+        Inty_VH = subset2.getBand(selectedBand)
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
@@ -144,7 +156,7 @@ def findK(newframe):
         
         parameters.put('region', "100,10,10,10")
         subset3 = GPF.createProduct('Subset', parameters, subset)
-        Inty_VH = subset3.getBand('Intensity_VH')
+        Inty_VH = subset3.getBand(selectedBand)
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
@@ -158,7 +170,7 @@ def findK(newframe):
         
         parameters.put('region', "100,100,10,10")
         subset4 = GPF.createProduct('Subset', parameters, subset)
-        Inty_VH = subset4.getBand('Intensity_VH')
+        Inty_VH = subset4.getBand(selectedBand)
         w = Inty_VH.getRasterWidth()
         h = Inty_VH.getRasterHeight()
         Inty_VH_data = np.zeros(w * h, np.float32)
@@ -282,11 +294,19 @@ def calculateSigma(*args):
 
 
 def selectFile():
+    
     global filename
+    global opmenu
+    global OpMenu
     #print(filename)
     filename = askopenfilename()
-    print(filename)
     tk.Label(mainframe, text="File Selected", width=15).grid(column=2, row=1, sticky=W)
+    p=ProductIO.readProduct(filename)       
+    BandNames=list(p.getBandNames())#function to create array of BandNames
+    print(BandNames)
+    
+    OpMenu.set("Select The Band Name") # default value
+    opmenu = OptionMenu(mainframe, OpMenu, BandNames[0],BandNames[1], BandNames[2], BandNames[3]).grid(column=1, row=8)
 
 #-----------------------------------------------------------------------------------------------------------
 
@@ -311,6 +331,7 @@ frequency = StringVar()
 Pagr = StringVar()
 alpha = StringVar()
 num=StringVar()
+OpMenu = StringVar()
 
 #----------------------------------------------------
 
@@ -353,7 +374,7 @@ tk.Label(mainframe, text="in Metres^2").grid(column=3, row=5, sticky=W)
 tk.Label(mainframe, text="Alpha").grid(column=1, row=6, sticky=W)
 tk.Label(mainframe, text="Degrees").grid(column=3, row=6, sticky=W)
 
-tk.Label(mainframe, text="Number of Ref").grid(column=1, row=7, sticky=W)
+tk.Label(mainframe, text="Number of Reflector(s)").grid(column=1, row=7, sticky=W)
 tk.Button(mainframe, text="Confirm", command=display).grid(column=3, row=7, sticky=W)
 
 
